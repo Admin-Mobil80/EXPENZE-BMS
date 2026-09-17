@@ -1,0 +1,806 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Expenze BMS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root { --paper:#F4F5F2; --surface:#FFFFFF; --surface-2:#ECEEE9; --ink:#17191C;
+  --ink-2:#3D4148; --muted:#6A6E67; --rule:#DCDDD7; --rule-firm:#C2C4BC;
+  --ok:#1E7047; --ok-bg:#E4F0E8; --warn:#96610F; --warn-bg:#F6EDDC;
+  --bad:#9E2F27; --bad-bg:#F6E4E2; --review:#4A5768; --review-bg:#E6E9EE;
+  --on-ok:#F4F5F2; --radius:3px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper:#131513; --surface:#1B1D1B; --surface-2:#232622; --ink:#ECEEE8;
+  --ink-2:#C3C7BE; --muted:#8D9289; --rule:#32352F; --rule-firm:#454941;
+  --ok:#6FC393; --ok-bg:#16301F; --warn:#DBA65C; --warn-bg:#33260F;
+  --bad:#E08A82; --bad-bg:#351B18; --review:#A2AFC2; --review-bg:#1E242C;
+  --on-ok:#0F1F16; } }
+:root[data-theme="dark"] { --paper:#131513; --surface:#1B1D1B; --surface-2:#232622;
+  --ink:#ECEEE8; --ink-2:#C3C7BE; --muted:#8D9289; --rule:#32352F; --rule-firm:#454941;
+  --ok:#6FC393; --ok-bg:#16301F; --warn:#DBA65C; --warn-bg:#33260F;
+  --bad:#E08A82; --bad-bg:#351B18; --review:#A2AFC2; --review-bg:#1E242C;
+  --on-ok:#0F1F16; }
+/* Views differ in height, so some need a scrollbar and some do not. Without a
+   reserved gutter the page width changes by the scrollbar's width every time
+   that flips - which is the sideways "jump" when switching tabs. */
+html { scrollbar-gutter: stable; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--paper); color:var(--ink); font-size:15px; line-height:1.5;
+  font-family:"Archivo",ui-sans-serif,system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+.wrap { max-width:1200px; margin:0 auto; padding:24px 20px 60px; display:flex;
+  flex-direction:column; gap:20px; }
+.masthead { display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between;
+  gap:12px 22px; padding-bottom:14px; border-bottom:2px solid var(--ink); }
+.brand h1 { margin:0; font-size:1.45rem; font-weight:700; letter-spacing:-.022em; }
+.brand p { margin:3px 0 0; color:var(--muted); font-size:.84rem; }
+.session { display:flex; align-items:center; gap:10px; }
+.avatar { width:36px; height:36px; border-radius:50%; display:grid; place-items:center;
+  background:var(--ink); color:var(--paper); font-weight:600; font-size:.8rem; flex:none; }
+.idn { display:flex; flex-direction:column; line-height:1.3; }
+.idn .nm { font-weight:600; font-size:.86rem; }
+.idn .rl { font-family:"IBM Plex Mono",monospace; font-size:.66rem; color:var(--muted);
+  text-transform:uppercase; letter-spacing:.06em; }
+.panel { background:var(--surface); border:1px solid var(--rule); border-radius:var(--radius); }
+.panel > header { padding:10px 14px; border-bottom:1px solid var(--rule); display:flex;
+  align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.panel > header h2 { margin:0; font-size:.77rem; font-weight:600; text-transform:uppercase;
+  letter-spacing:.08em; }
+.panel > header .sub { font-family:"IBM Plex Mono",monospace; font-size:.69rem; color:var(--muted); }
+.tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:1px;
+  background:var(--rule); border:1px solid var(--rule); border-radius:var(--radius); overflow:hidden; }
+.tiles > div { background:var(--surface); padding:13px 14px; display:flex; flex-direction:column; gap:3px; }
+.tiles .k { font-size:.65rem; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+.tiles .v { font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums;
+  font-size:1.6rem; font-weight:600; letter-spacing:-.03em; line-height:1.1; }
+.tiles .note { font-size:.72rem; color:var(--muted); }
+.tiles .credits .v { color:var(--ok); }
+.scroll { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:.85rem; }
+thead th { text-align:left; font-size:.64rem; text-transform:uppercase; letter-spacing:.08em;
+  color:var(--muted); font-weight:600; padding:9px 14px; border-bottom:1px solid var(--rule);
+  white-space:nowrap; }
+tbody td { padding:9px 14px; border-bottom:1px solid var(--rule); vertical-align:middle; }
+tbody tr:last-child td { border-bottom:none; }
+td.n { font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums;
+  text-align:right; white-space:nowrap; }
+td.n.low { color:var(--warn); font-weight:600; }
+td.n.zero { color:var(--bad); font-weight:600; }
+td .owner { font-family:"IBM Plex Mono",monospace; font-size:.76rem; color:var(--muted); }
+td .orgname { font-weight:600; }
+/* Under the headcount, not beside it: the number is what the column is for,
+   and how many of them have never signed in is the caveat on it. */
+td .waiting { display:block; font-family:"IBM Plex Mono",monospace; font-size:.62rem;
+  color:var(--warn); font-weight:400; white-space:nowrap; }
+.pill { font-family:"IBM Plex Mono",monospace; font-size:.62rem; text-transform:uppercase;
+  letter-spacing:.06em; padding:1px 6px; border:1px solid var(--rule-firm);
+  border-radius:var(--radius); color:var(--muted); white-space:nowrap; }
+.pill.root { border-color:var(--ok); color:var(--ok); }
+.btn { font:inherit; font-size:.79rem; font-weight:500; padding:6px 11px; border-radius:var(--radius);
+  border:1px solid var(--rule-firm); background:var(--surface); color:var(--ink); cursor:pointer; }
+.btn:hover:not(:disabled) { border-color:var(--ink-2); }
+.btn:disabled { opacity:.45; cursor:not-allowed; }
+.btn.primary { background:var(--ok); color:var(--on-ok); border-color:var(--ok); }
+.btn.danger { color:var(--bad); border-color:var(--bad); }
+input[type=text], input[type=number], input[type=email] { font-family:"IBM Plex Mono",monospace;
+  font-size:.8rem; padding:6px 8px; color:var(--ink); background:var(--surface);
+  border:1px solid var(--rule-firm); border-radius:var(--radius); }
+:is(button,input):focus-visible { outline:2px solid var(--ink); outline-offset:2px; }
+.formrow { display:flex; flex-wrap:wrap; gap:8px; align-items:flex-end; padding:12px 14px;
+  background:var(--surface-2); border-bottom:1px solid var(--rule); }
+/* While there is something to save. A Save button below a long table is a
+   Save button nobody reaches, and the edit is lost in silence. */
+.formrow.pinned { position:sticky; bottom:0; z-index:3; align-items:center;
+  border-top:1px solid var(--rule-firm); border-bottom:0;
+  box-shadow:0 -6px 14px -10px rgba(0,0,0,.4); }
+.formrow.pinned::before { content:"Unsaved"; font-family:"IBM Plex Mono",monospace;
+  font-size:.66rem; text-transform:uppercase; letter-spacing:.07em; color:var(--warn);
+  margin-right:2px; }
+.f { display:flex; flex-direction:column; gap:4px; }
+.f label { font-size:.65rem; text-transform:uppercase; letter-spacing:.07em; color:var(--muted);
+  font-weight:600; }
+.msg { font-family:"IBM Plex Mono",monospace; font-size:.75rem; padding:10px 14px; }
+.msg.ok { color:var(--ok); } .msg.err { color:var(--bad); }
+.nav { display:flex; gap:4px; border-bottom:1px solid var(--rule); }
+/* Views differ a lot in height. Without a floor, switching to a short one
+   collapses the page and drops the scrollbar - which reads as a jump even
+   though the scroll position is already at the top. */
+#view-orgs, #view-settings, #view-admins { min-height:calc(100vh - 300px); }
+.nav button { font:inherit; font-size:.86rem; font-weight:500; padding:9px 15px; background:none;
+  border:none; border-bottom:2px solid transparent; color:var(--muted); cursor:pointer;
+  margin-bottom:-1px; }
+.nav button:hover { color:var(--ink); }
+.nav button[aria-current="true"] { color:var(--ink); border-bottom-color:var(--ink); font-weight:600; }
+.banner { padding:11px 14px; font-size:.81rem; border-bottom:1px solid var(--rule);
+  background:var(--review-bg); color:var(--review); display:flex; gap:9px;
+  align-items:baseline; flex-wrap:wrap; }
+.banner strong { font-weight:600; }
+.listbar { display:flex; align-items:center; gap:10px; padding:10px 14px;
+  background:var(--surface-2); border-bottom:1px solid var(--rule); }
+.listbar input { flex:1 1 260px; min-width:0; font-family:inherit; font-size:.82rem;
+  padding:7px 9px; border:1px solid var(--rule-firm); border-radius:var(--radius);
+  background:var(--surface); color:var(--ink); }
+.listbar-count { font-family:"IBM Plex Mono",monospace; font-size:.7rem; color:var(--muted);
+  white-space:nowrap; }
+.load-row td { background:var(--surface-2); padding:0; }
+.loadform { padding:13px 14px; display:flex; gap:11px; align-items:flex-end; flex-wrap:wrap; }
+.loadform .f input { font-family:"IBM Plex Mono",monospace; font-size:.82rem; padding:7px 9px;
+  border:1px solid var(--rule-firm); border-radius:var(--radius);
+  background:var(--surface); color:var(--ink); }
+.loadform .grow { flex:1 1 220px; min-width:0; }
+.loadform .grow input { width:100%; }
+.loadform .hint { font-size:.75rem; color:var(--muted); flex-basis:100%; margin:0; }
+.setgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:1px;
+  background:var(--rule); }
+.setgrid > section { background:var(--surface); padding:14px; display:flex;
+  flex-direction:column; gap:10px; }
+.setgrid h3 { margin:0; font-size:.68rem; text-transform:uppercase; letter-spacing:.08em;
+  color:var(--muted); font-weight:600; }
+.setgrid p { margin:0; font-size:.8rem; color:var(--muted); }
+.setgrid .f input { width:100%; max-width:22rem; }
+td.editcell input { font-family:"IBM Plex Mono",monospace; font-size:.8rem; padding:5px 7px;
+  width:110px; text-align:right; border:1px solid var(--rule-firm);
+  border-radius:var(--radius); background:var(--surface); color:var(--ink); }
+td.r { font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums;
+  text-align:right; color:var(--ok); font-weight:600; }
+tr/* The pre-tax rate under the one the customer pays: the first is what they
+   are invoiced per receipt, the second is what the margin is measured on. */
+.net { font-family:"IBM Plex Mono",monospace; font-size:.63rem; color:var(--muted); }
+/* Payment keys. Secrets are write-only here: the field is empty whether or
+   not one is set, and what is set is stated beside it in words. */
+.paygrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:1px;
+  background:var(--rule); }
+.paygrid > section { background:var(--surface); padding:16px; display:flex;
+  flex-direction:column; gap:11px; }
+.paygrid h3 { margin:0; font-size:.68rem; text-transform:uppercase; letter-spacing:.08em;
+  color:var(--muted); font-weight:600; }
+.paygrid p { margin:2px 0 0; font-size:.78rem; color:var(--muted); line-height:1.55; }
+.paygrid .f { display:flex; flex-direction:column; gap:4px; }
+.paygrid label { font-size:.65rem; text-transform:uppercase; letter-spacing:.07em;
+  color:var(--muted); font-weight:600; }
+.paygrid input { font-family:"IBM Plex Mono",monospace; font-size:.8rem; padding:7px 9px;
+  width:100%; border:1px solid var(--rule-firm); border-radius:var(--radius);
+  background:var(--surface); color:var(--ink); }
+.modeswitch { display:flex; gap:6px; }
+.modeswitch button { font:inherit; font-size:.84rem; padding:7px 14px; cursor:pointer;
+  border:1px solid var(--rule-firm); border-radius:var(--radius);
+  background:var(--surface); color:var(--ink-2); }
+.modeswitch button[aria-pressed="true"] { background:var(--ink); color:var(--surface);
+  border-color:var(--ink); font-weight:600; }
+.modeswitch button.livemode[aria-pressed="true"] { background:var(--bad); border-color:var(--bad); }
+.keystate { font-family:"IBM Plex Mono",monospace; font-size:.7rem; }
+.keystate.on { color:var(--ok); } .keystate.off { color:var(--muted); }
+.keystate.bad { color:var(--bad); }
+.dirty td { background:var(--warn-bg); }
+.gate { max-width:30rem; margin:80px auto; text-align:center; }
+.gate h2 { font-size:1.1rem; margin:0 0 8px; }
+.gate p { color:var(--muted); font-size:.9rem; margin:0 0 16px; }
+[hidden] { display:none !important; }
+.tick { display:flex; align-items:center; gap:8px; font-size:.86rem;
+  margin-bottom:10px; cursor:pointer; }
+.tick input { margin:0; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app" hidden>
+  <header class="masthead">
+    <div class="brand">
+      <h1>Expenze BMS</h1>
+      <p>Business Management System &middot; every organisation on the platform</p>
+    </div>
+    <div class="session">
+      <div class="avatar" id="avatar"></div>
+      <div class="idn"><span class="nm" id="who"></span><span class="rl" id="role"></span></div>
+      <button class="btn" id="signout" type="button">Sign out</button>
+    </div>
+  </header>
+
+  <nav class="nav" id="nav"></nav>
+
+  <div id="view-orgs" style="display:flex;flex-direction:column;gap:20px">
+  <section class="tiles">
+    <div><span class="k">Organisations</span><span class="v" id="t-orgs"></span><span class="note">Signed up to date.</span></div>
+    <div class="credits"><span class="k">Credits outstanding</span><span class="v" id="t-credits"></span><span class="note">Balance across all accounts.</span></div>
+    <div><span class="k">Receipts processed</span><span class="v" id="t-receipts"></span><span class="note">Billed, all channels.</span></div>
+    <div><span class="k">Credits procured</span><span class="v" id="t-purchased"></span><span class="note">Trial grants included.</span></div>
+  </section>
+
+  <section class="panel">
+    <header><h2>Organisations</h2><span class="sub" id="orgs-sub"></span></header>
+    <div class="listbar">
+      <input type="search" id="org-filter" placeholder="Filter by organisation or owner"
+             aria-label="Filter organisations">
+      <span class="listbar-count" id="org-count"></span>
+    </div>
+    <p class="msg" id="l-msg" hidden></p>
+    <div class="scroll">
+      <table><thead><tr>
+        <th scope="col">Organisation</th><th scope="col">Account owner</th>
+        <th scope="col" style="text-align:right">People</th>
+        <th scope="col" style="text-align:right">Balance</th>
+        <th scope="col" style="text-align:right">Receipts</th>
+        <th scope="col" style="text-align:right">Procured</th>
+        <th scope="col"></th>
+      </tr></thead><tbody id="orgs"></tbody></table>
+    </div>
+  </section>
+
+  </div>
+
+  <div id="view-settings" style="display:none;flex-direction:column;gap:20px">
+  <section class="panel" id="settings-panel">
+    <header><h2>Platform settings</h2><span class="sub" id="settings-sub"></span></header>
+    <div class="banner" id="settings-banner"></div>
+    <div class="setgrid">
+      <section>
+        <h3>Channels</h3>
+        <div class="f"><label for="s-wa">WhatsApp number</label>
+          <input type="text" id="s-wa" placeholder="+91 XXXXX XXXXX"></div>
+        <div class="f"><label for="s-mail">Receipt intake address</label>
+          <input type="text" id="s-mail" placeholder="receipts@expenze.ai"></div>
+        <p>One number and one mailbox serve every customer. The <em>sender</em> is
+           resolved to an organisation, so these are the same for everyone.</p>
+      </section>
+      <section>
+        <h3>Trial</h3>
+        <div class="f"><label for="s-trial">Free credits on sign-up</label>
+          <input type="number" id="s-trial" min="0" step="1" style="width:120px"></div>
+        <p>Granted once, when an organisation is created. Enough to audit a real week
+           of receipts and form a view &mdash; not enough to run on.</p>
+      </section>
+      <section>
+        <h3>Low-credit alerts</h3>
+        <label class="tick"><input type="checkbox" id="s-alerts"> Warn owners and
+          finance executives before an organisation runs out</label>
+        <div class="f"><label for="s-lowc">Credits remaining</label>
+          <input type="number" id="s-lowc" min="0" step="1" style="width:120px"></div>
+        <div class="f"><label for="s-lowd">Or days of runway</label>
+          <input type="number" id="s-lowd" min="0" step="1" style="width:120px"></div>
+        <p>Whichever is crossed first. Two thresholds because organisations run out
+           differently: a company filing four receipts a month wants warning at a low
+           number, one filing four hundred wants a week's notice whatever the number.
+           Sent by email, and on WhatsApp to anyone who has verified a number.
+           Once per crossing &mdash; it re-arms when the balance recovers.</p>
+      </section>
+      <section>
+        <h3>Indian tax</h3>
+        <div class="f"><label for="s-gst">GST added to INR sales</label>
+          <input type="number" id="s-gst" min="0" max="50" step="0.5" style="width:120px"></div>
+        <p>Added on top of the INR price at checkout and shown to the customer as its own
+           line, never folded into the price. USD sales are an export of services and are
+           not taxed here.</p>
+      </section>
+    </div>
+
+    <header style="border-top:1px solid var(--rule)">
+      <h2>Credit pricing</h2>
+      <span class="sub">India pays the INR price plus GST &middot; everywhere else pays USD</span>
+    </header>
+    <div class="scroll">
+      <table><thead><tr>
+        <th scope="col">Slab</th>
+        <th scope="col" style="text-align:right">Price (USD)</th>
+        <th scope="col" style="text-align:right">$ / receipt</th>
+        <th scope="col" style="text-align:right">Price (INR)</th>
+        <th scope="col" style="text-align:right">+ GST</th>
+        <th scope="col" style="text-align:right">India pays</th>
+        <th scope="col" style="text-align:right">&#8377; / receipt</th>
+      </tr></thead><tbody id="pricing"></tbody></table>
+    </div>
+    <header style="border-top:1px solid var(--rule)">
+      <h2>Payments</h2>
+      <span class="sub" id="pay-mode-sub"></span>
+    </header>
+    <div class="paygrid">
+      <section>
+        <h3>Mode</h3>
+        <div class="modeswitch" id="pay-mode"></div>
+        <p id="pay-mode-note"></p>
+      </section>
+      <section>
+        <h3>Test keys</h3>
+        <div class="f"><label for="k-test-id">Key ID</label>
+          <input type="text" id="k-test-id" placeholder="rzp_test_..." autocomplete="off"></div>
+        <div class="f"><label for="k-test-secret">Key secret</label>
+          <input type="password" id="k-test-secret" placeholder="write-only" autocomplete="new-password"></div>
+        <p id="k-test-state"></p>
+      </section>
+      <section>
+        <h3>Live keys</h3>
+        <div class="f"><label for="k-live-id">Key ID</label>
+          <input type="text" id="k-live-id" placeholder="rzp_live_..." autocomplete="off"></div>
+        <div class="f"><label for="k-live-secret">Key secret</label>
+          <input type="password" id="k-live-secret" placeholder="write-only" autocomplete="new-password"></div>
+        <p id="k-live-state"></p>
+      </section>
+    </div>
+    <div class="formrow">
+      <button class="btn primary" type="button" id="pay-save">Save payment keys</button>
+      <p class="msg" id="pay-msg" hidden style="padding:0"></p>
+    </div>
+
+    <div class="formrow" id="settings-actions">
+      <button class="btn primary" type="button" id="s-save">Save settings</button>
+      <button class="btn" type="button" id="s-reset">Discard changes</button>
+      <p class="msg" id="s-msg" hidden style="padding:0"></p>
+    </div>
+  </section>
+
+  </div>
+
+  <div id="view-admins" style="display:none;flex-direction:column;gap:20px">
+  <section class="panel" id="admin-panel">
+    <header><h2>Administrators</h2><span class="sub" id="admins-sub"></span></header>
+    <div class="formrow" id="admin-form">
+      <div class="f" style="flex:1 1 240px"><label for="a-email">Grant admin access to</label>
+        <input type="email" id="a-email" placeholder="name@expenze.ai" style="width:100%"></div>
+      <button class="btn primary" id="a-go" type="button">Add administrator</button>
+    </div>
+    <p class="msg" id="a-msg" hidden></p>
+    <div class="scroll">
+      <table><thead><tr>
+        <th scope="col">Email</th><th scope="col">Role</th><th scope="col">Added by</th><th scope="col"></th>
+      </tr></thead><tbody id="admins"></tbody></table>
+    </div>
+  </section>
+  </div>
+</div>
+
+<div class="gate" id="gate">
+  <h2 id="gate-title">Checking your access…</h2>
+  <p id="gate-msg">One moment.</p>
+  <a class="btn" href="/">Back to sign in</a>
+</div>
+
+<script>
+"use strict";
+const API = "https://0w1qn4vso1.execute-api.ap-southeast-1.amazonaws.com/poc/admin";
+const $ = (id) => document.getElementById(id);
+const n = (v) => Number(v || 0).toLocaleString("en-US");
+let ME = null, ORGS = [], SETTINGS = null, draft = null;
+
+/* Root-only controls. Declared once here rather than as a local in each
+   renderer: it was a function-scoped const in two of them, so a third that
+   referenced it threw ReferenceError and silently rendered nothing at all. */
+const amRoot = () => !!ME && ME.role === "root";
+let view = "orgs";
+
+function renderNav() {
+  const nav = $("nav"); nav.textContent = "";
+  [["orgs","Organisations"],["settings","Settings"],["admins","Administrators"]]
+    .forEach(([id,label]) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("aria-current", String(view === id));
+      b.textContent = label;
+      b.addEventListener("click", () => {
+        view = id;
+        renderNav();
+        // A shorter page under a scrolled window looks like a jump.
+        window.scrollTo({ top: 0 });
+      });
+      nav.appendChild(b);
+    });
+  ["orgs","settings","admins"].forEach(v => {
+    const el = $("view-" + v);
+    if (el) el.style.display = view === v ? "flex" : "none";
+  });
+}
+
+function token() {
+  try { return sessionStorage.getItem("expenze_token") || ""; } catch (_) { return ""; }
+}
+function gate(title, msg) {
+  $("app").hidden = true;
+  $("gate").hidden = false;
+  $("gate-title").textContent = title;
+  $("gate-msg").textContent = msg;
+}
+async function call(path, opts = {}) {
+  const res = await fetch(API + path, {
+    ...opts,
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + token(), ...(opts.headers || {}) }
+  });
+  let data = {};
+  try { data = await res.json(); } catch (_) {}
+  return { ok: res.ok, status: res.status, data };
+}
+
+let orgFilter = "", loadOpen = null;
+
+function renderOrgs() {
+  const tb = $("orgs"); tb.textContent = "";
+  $("orgs-sub").textContent = ORGS.length + (ORGS.length === 1 ? " account" : " accounts");
+  $("org-filter").value = orgFilter;
+
+  // Totals are of everything, not of the filtered view - a filter should not
+  // silently change what the numbers above mean.
+  let credits = 0, receipts = 0, purchased = 0;
+  ORGS.forEach(o => { credits += o.credits; receipts += o.receipts; purchased += o.purchased; });
+
+  const q = orgFilter.trim().toLowerCase();
+  const shown = ORGS.filter(o =>
+    !q || o.name.toLowerCase().includes(q) || (o.owner || "").toLowerCase().includes(q));
+  $("org-count").textContent = q
+    ? `${shown.length} of ${ORGS.length}` : `${ORGS.length} total`;
+
+  if (!shown.length) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = '<td colspan="7" style="padding:20px 14px;text-align:center;color:var(--muted)">No organisation matches that.</td>';
+    tb.appendChild(tr);
+  }
+
+  shown.forEach(o => {
+    const tr = document.createElement("tr");
+    const cls = o.credits === 0 ? "zero" : o.credits < 100 ? "low" : "";
+    const open = loadOpen === o.org_id;
+    const act = ME.role === "root" || ME.role === "admin"
+      ? `<button class="btn ${open ? "" : "primary"}" type="button" data-load="${o.org_id}">${open ? "Cancel" : "Load credits"}</button>`
+      : "";
+    tr.innerHTML =
+      `<td><span class="orgname">${o.name}</span>${o.trial ? ' <span class="pill">trial</span>' : ""}</td>` +
+      `<td><span class="owner">${o.owner}</span></td>` +
+      // How big the account is, and how much of it is real. An organisation
+      // that invited forty people and has two signed in is a very different
+      // account from one with two people in it, and the balance alone does
+      // not say which is which.
+      `<td class="n">${n(o.users)}` +
+        (o.users > o.active_users
+          ? `<span class="waiting">${n(o.users - o.active_users)} not signed in</span>` : "") +
+      `</td>` +
+      `<td class="n ${cls}">${n(o.credits)}</td>` +
+      `<td class="n">${n(o.receipts)}</td>` +
+      `<td class="n">${n(o.purchased)}</td>` +
+      `<td style="text-align:right">${act}</td>`;
+    tb.appendChild(tr);
+    if (open) tb.appendChild(loadForm(o));
+  });
+
+  tb.querySelectorAll("button[data-load]").forEach(b =>
+    b.addEventListener("click", () => {
+      loadOpen = loadOpen === b.dataset.load ? null : b.dataset.load;
+      renderOrgs();
+    }));
+
+  $("t-orgs").textContent = n(ORGS.length);
+  $("t-credits").textContent = n(credits);
+  $("t-receipts").textContent = n(receipts);
+  $("t-purchased").textContent = n(purchased);
+}
+
+/** Load credits onto one organisation, opened against its own row. */
+function loadForm(o) {
+  const tr = document.createElement("tr");
+  tr.className = "load-row";
+  const td = document.createElement("td");
+  td.colSpan = 6;
+  td.innerHTML = `
+    <div class="loadform">
+      <div class="f"><label for="lf-credits">Credits</label>
+        <input type="number" id="lf-credits" min="1" step="1" value="1000" style="width:120px"></div>
+      <div class="f grow"><label for="lf-ref">Reference</label>
+        <input type="text" id="lf-ref" placeholder="Invoice INV-2026-014"></div>
+      <button class="btn primary" type="button" id="lf-go">Load onto ${o.name}</button>
+      <p class="hint">Balance is ${n(o.credits)}. The grant is recorded against your name.</p>
+    </div>`;
+  tr.appendChild(td);
+
+  td.querySelector("#lf-go").addEventListener("click", async () => {
+    const btn = td.querySelector("#lf-go");
+    const credits = parseInt(td.querySelector("#lf-credits").value, 10);
+    btn.disabled = true;
+    const { ok, data } = await call("/credits", {
+      method: "POST",
+      body: JSON.stringify({ org_id: o.org_id, credits, note: td.querySelector("#lf-ref").value.trim() })
+    });
+    btn.disabled = false;
+    if (!ok) return flash("l-msg", data.error || "Could not load credits.", false);
+    flash("l-msg", `Loaded ${n(credits)} credits onto ${o.name}. New balance ${n(data.credits)}.`, true);
+    loadOpen = null;
+    loadOrgs();
+  });
+  return tr;
+}
+
+function renderAdmins(admins) {
+  const isRoot = amRoot();
+  $("admin-form").hidden = !isRoot;
+  $("admins-sub").textContent = isRoot
+    ? admins.length + " with access"
+    : admins.length + " with access · root only can change this";
+  const tb = $("admins"); tb.textContent = "";
+  admins.forEach(a => {
+    const tr = document.createElement("tr");
+    const revoke = (isRoot && a.role !== "root")
+      ? `<button class="btn danger" data-revoke="${a.email}" type="button">Revoke</button>` : "";
+    tr.innerHTML =
+      `<td><span class="owner">${a.email}</span></td>` +
+      `<td><span class="pill ${a.role === "root" ? "root" : ""}">${a.role}</span></td>` +
+      `<td><span class="owner">${a.added_by || "—"}</span></td>` +
+      `<td style="text-align:right">${revoke}</td>`;
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll("button[data-revoke]").forEach(b =>
+    b.addEventListener("click", async () => {
+      b.disabled = true;
+      const { ok, data } = await call("/revoke", { method: "POST", body: JSON.stringify({ email: b.dataset.revoke }) });
+      if (!ok) { flash("a-msg", data.error || "Could not revoke.", false); b.disabled = false; return; }
+      flash("a-msg", `Removed ${b.dataset.revoke}.`, true);
+      loadAdmins();
+    }));
+}
+
+function flash(id, text, good) {
+  const el = $(id);
+  if (!el) return;
+  el.hidden = false;
+  el.className = "msg " + (good ? "ok" : "err");
+  el.textContent = text;
+}
+
+async function loadOrgs() {
+  const { ok, status, data } = await call("/orgs");
+  if (status === 401) return gate("Sign in required", "Your session has expired. Sign in again to continue.");
+  if (status === 403) return gate("Not an administrator", data.error || "This console is for Expenze administrators.");
+  if (!ok) return gate("Could not load", data.error || "Try again shortly.");
+  ME = data.you; ORGS = data.orgs;
+  $("who").textContent = ME.email;
+  $("role").textContent = ME.role === "root" ? "Root administrator" : "Administrator";
+  $("avatar").textContent = ME.email.slice(0, 2).toUpperCase();
+  $("gate").hidden = true; $("app").hidden = false;
+  renderNav();
+  renderOrgs();
+}
+
+/* ---------- platform settings ---------- */
+
+/* Follow the edit down the page.
+   
+   The WhatsApp number sits at the top of this panel and Save sits under the
+   whole pricing table, so somebody changing the number types it, sees
+   "unsaved changes" appear beside a heading that has already scrolled away,
+   and leaves. The change is lost without a word. Sticking the actions row to
+   the bottom of the window while there is something to save means the button
+   is wherever the person is. */
+function paintSettingsState() {
+  const dirty = settingsDirty();
+  const sub = $("settings-sub");
+  if (sub) sub.textContent = dirty ? "unsaved changes" : "saved";
+  const actions = $("settings-actions");
+  if (actions) actions.classList.toggle("pinned", dirty);
+}
+
+function settingsDirty() {
+  if (!SETTINGS || !draft) return false;
+  return JSON.stringify(draft) !== JSON.stringify(SETTINGS);
+}
+
+function renderSettings() {
+  const isRoot = amRoot();
+  paintSettingsState();
+  $("settings-banner").innerHTML = isRoot
+    ? `<strong>Editing as ${ME.email}.</strong><span>Pricing and channel numbers are commercial decisions &mdash; root only, same bar as appointing an administrator.</span>`
+    : `<strong>Read-only.</strong><span>Only the root admin can change platform settings.</span>`;
+  $("settings-actions").style.display = isRoot ? "flex" : "none";
+
+  const bind = (id, key, num) => {
+    const el = $(id);
+    el.value = draft[key];
+    el.disabled = !isRoot;
+    el.oninput = () => {
+      draft[key] = num ? (parseInt(el.value, 10) || 0) : el.value;
+      paintSettingsState();
+    };
+  };
+  bind("s-wa", "whatsapp_number");
+  bind("s-mail", "intake_email");
+  bind("s-trial", "trial_credits", true);
+  bind("s-lowc", "low_credit_credits", true);
+  bind("s-lowd", "low_credit_days", true);
+
+  const alerts = $("s-alerts");
+  if (alerts) {
+    alerts.checked = !!draft.low_credit_alerts;
+    alerts.disabled = !isRoot;
+    alerts.onchange = () => {
+      draft.low_credit_alerts = alerts.checked;
+      paintSettingsState();
+    };
+  }
+
+  bind("s-gst", "gst_percent", true);
+
+  const tb = $("pricing"); tb.textContent = "";
+  const gst = Number(draft.gst_percent) || 0;
+
+  /* One editable price per currency. Neither is derived from the other: a
+     price computed from today's exchange rate is one no customer ever saw on
+     the pricing page, and one finance cannot reconcile against a settlement
+     six weeks later. */
+  const priceCell = (row, i, ccy) => {
+    const td = document.createElement("td");
+    td.style.textAlign = "right";
+    const inp = document.createElement("input");
+    inp.type = "number"; inp.min = "0"; inp.step = "1"; inp.value = row[ccy];
+    inp.disabled = !isRoot;
+    inp.setAttribute("aria-label", `${ccy.toUpperCase()} price for ${row.credits} credits`);
+    inp.oninput = () => {
+      draft.pricing[i][ccy] = parseInt(inp.value, 10) || 0;
+      renderSettings();
+    };
+    td.appendChild(inp);
+    return td;
+  };
+
+  draft.pricing.forEach((row, i) => {
+    const saved = SETTINGS.pricing[i] || {};
+    const perReceipt = row.usd / row.credits;
+    const tax = Math.round((row.inr || 0) * gst) / 100;
+    const total = (row.inr || 0) + tax;
+
+    const tr = document.createElement("tr");
+    if (saved.usd !== row.usd || saved.inr !== row.inr) tr.className = "dirty";
+    // Two per-receipt rates, one per currency, each next to the price it comes
+    // from. The INR figure is what an Indian customer actually pays per
+    // receipt - GST included, because that is the number on their invoice -
+    // with the pre-tax rate beneath it, which is the one margin is measured on.
+    const perReceiptInr = row.credits ? total / row.credits : 0;
+    const perReceiptInrNet = row.credits ? (row.inr || 0) / row.credits : 0;
+
+    tr.innerHTML =
+      `<td>${n(row.credits)} credits</td>` +
+      `<td class="usdcell"></td>` +
+      `<td class="r">$${perReceipt.toFixed(3)}</td>` +
+      `<td class="inrcell"></td>` +
+      `<td class="n">${gst ? "₹" + n(tax) : "—"}</td>` +
+      `<td class="n"><strong>₹${n(total)}</strong></td>` +
+      `<td class="r">₹${perReceiptInr.toFixed(2)}` +
+        (gst ? `<br><span class="net">₹${perReceiptInrNet.toFixed(2)} ex GST</span>` : "") +
+      `</td>`;
+    tr.querySelector(".usdcell").replaceWith(priceCell(row, i, "usd"));
+    tr.querySelector(".inrcell").replaceWith(priceCell(row, i, "inr"));
+    tb.appendChild(tr);
+  });
+}
+
+async function loadSettings() {
+  const { ok, data } = await call("/settings");
+  if (!ok) return;
+  SETTINGS = data.settings;
+  draft = JSON.parse(JSON.stringify(SETTINGS));
+  renderSettings();
+}
+
+/* ---------- payments ---------- */
+
+let PAY = { mode: "test", modes: {}, webhook_secret_set: false };
+let payDraftMode = null;
+
+async function loadPayments() {
+  const { ok, data } = await call("/payments");
+  if (!ok) return;                       // admins who are not root
+  PAY = data.payments;
+  payDraftMode = PAY.mode;
+  renderPayments();
+}
+
+function renderPayments() {
+  const isRoot = amRoot();
+  const mode = payDraftMode || PAY.mode;
+  $("pay-mode-sub").textContent = PAY.mode === "live"
+    ? "LIVE — real money" : "test mode";
+
+  const sw = $("pay-mode"); sw.textContent = "";
+  [["test", "Test"], ["live", "Live"]].forEach(([value, label]) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.textContent = label;
+    if (value === "live") b.className = "livemode";
+    b.setAttribute("aria-pressed", String(mode === value));
+    b.disabled = !isRoot;
+    b.onclick = () => { payDraftMode = value; renderPayments(); };
+    sw.appendChild(b);
+  });
+
+  const live = PAY.modes.live || {};
+  $("pay-mode-note").innerHTML = mode === "live"
+    ? (live.configured
+        ? "Every purchase takes real money from a customer's card. Nothing about the flow changes &mdash; only whose money it is."
+        : "<strong>No live keys are set.</strong> Add them below before switching.")
+    : "Purchases use Razorpay test cards. Nothing is charged and no settlement happens.";
+
+  [["test", "k-test-state"], ["live", "k-live-state"]].forEach(([name, id]) => {
+    const m = PAY.modes[name] || {};
+    const el = $(id);
+    if (m.mismatched) {
+      el.innerHTML = `<span class="keystate bad">the key under ${name} is not an rzp_${name}_ key</span>`;
+    } else if (m.configured) {
+      el.innerHTML = `<span class="keystate on">&#10003; set</span> ` +
+        `<span class="keystate off">${m.key_id}</span>` +
+        `<br>The secret is never shown. Enter both fields again to replace it.`;
+    } else {
+      el.innerHTML = `<span class="keystate off">not set</span>`;
+    }
+  });
+
+  $("pay-save").style.display = isRoot ? "" : "none";
+}
+
+$("pay-save").addEventListener("click", async () => {
+  const btn = $("pay-save"); btn.disabled = true;
+  const pair = (name) => ({
+    key_id: $(`k-${name}-id`).value.trim(),
+    key_secret: $(`k-${name}-secret`).value.trim(),
+  });
+  const { ok, data } = await call("/payments", { method: "POST", body: JSON.stringify({
+    mode: payDraftMode || PAY.mode, test: pair("test"), live: pair("live"),
+  })});
+  btn.disabled = false;
+  if (!ok) return flash("pay-msg", data.error || "Could not save.", false);
+
+  PAY = data.payments;
+  payDraftMode = PAY.mode;
+  // Cleared on success: the field is write-only, and leaving a secret sitting
+  // in a form is how it ends up in a screenshot.
+  ["k-test-secret", "k-live-secret", "k-test-id", "k-live-id"].forEach(id => { $(id).value = ""; });
+  flash("pay-msg", PAY.mode === "live"
+    ? "Saved. Payments are LIVE — purchases now take real money."
+    : "Saved. Payments are in test mode.", true);
+  renderPayments();
+});
+
+$("s-save").addEventListener("click", async () => {
+  const btn = $("s-save"); btn.disabled = true;
+  const { ok, data } = await call("/settings", { method: "POST", body: JSON.stringify(draft) });
+  btn.disabled = false;
+  if (!ok) return flash("s-msg", data.error || "Could not save.", false);
+  SETTINGS = data.settings;
+  draft = JSON.parse(JSON.stringify(SETTINGS));
+  flash("s-msg", "Saved. New pricing applies to purchases from now on.", true);
+  renderSettings();
+  paintSettingsState();
+});
+
+$("s-reset").addEventListener("click", () => {
+  draft = JSON.parse(JSON.stringify(SETTINGS));
+  $("s-msg").hidden = true;
+  renderSettings();
+  paintSettingsState();
+});
+
+async function loadAdmins() {
+  const { ok, data } = await call("/admins");
+  if (ok) renderAdmins(data.admins);
+}
+
+$("org-filter").addEventListener("input", e => {
+  orgFilter = e.target.value;
+  loadOpen = null;
+  renderOrgs();
+});
+
+$("a-go").addEventListener("click", async () => {
+  const btn = $("a-go"); btn.disabled = true;
+  const { ok, data } = await call("/admins", { method: "POST", body: JSON.stringify({ email: $("a-email").value.trim() }) });
+  btn.disabled = false;
+  if (!ok) return flash("a-msg", data.error || "Could not add administrator.", false);
+  flash("a-msg", `${data.email} can now sign in to BMS.`, true);
+  $("a-email").value = "";
+  loadAdmins();
+});
+
+$("signout").addEventListener("click", () => {
+  try { sessionStorage.removeItem("expenze_token"); } catch (_) {}
+  location.href = "/";
+});
+
+if (!token()) {
+  gate("Sign in required", "BMS needs a signed-in administrator.");
+} else {
+  loadOrgs().then(() => { if (ME) { loadAdmins(); loadSettings(); loadPayments(); } });
+}
+</script>
+</body>
+</html>
