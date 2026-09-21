@@ -40,12 +40,27 @@ jobs:
       # No build step and nothing fingerprinted: two hand-written HTML files,
       # both entry points, neither cacheable. A cached copy keeps whoever is
       # running the platform looking at the previous release.
+      #
+      # Two passes, because `--content-type` applies to every object in the
+      # sync and this repo is no longer only HTML. One flag stamped the icons
+      # as `text/html; charset=utf-8`, and a browser handed an .ico labelled
+      # HTML simply does not draw it.
+      #
+      # The first pass carries `--delete` and covers everything; the second
+      # only rewrites the content type on the HTML.
       - name: Sync
         run: |
           aws s3 sync . "s3://$BUCKET/" \
             --delete \
             --exclude ".git/*" --exclude ".github/*" \
             --exclude ".gitignore" --exclude "README.md" --exclude ".DS_Store" \
+            --cache-control "no-cache, must-revalidate"
+
+      - name: Stamp the HTML content type
+        run: |
+          aws s3 cp "s3://$BUCKET/" "s3://$BUCKET/" \
+            --recursive --exclude "*" --include "*.html" \
+            --metadata-directive REPLACE \
             --cache-control "no-cache, must-revalidate" \
             --content-type "text/html; charset=utf-8"
 
